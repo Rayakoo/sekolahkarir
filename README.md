@@ -38,12 +38,11 @@ Setiap lowongan memiliki timeline yang dapat berbeda. Contohnya, posisi Frontend
   - upload file PDF, DOC, DOCX, ZIP, PNG, atau JPG,
   - mengirim link jawaban,
   - menambahkan catatan,
-  - memperbarui jawaban selama tahap masih berjalan,
   - otomatis menyelesaikan tahap tes dan membuka tahap berikutnya (mode demo).
 - **Aksi interview** pada tahap bertipe interview:
-  - tombol untuk membuka Google Meet atau Interview AI,
-  - tombol **Masuk** untuk membuka sesi dan langsung memajukan timeline.
-- **Pesan menunggu pengumuman** pada tahap akhir yang sedang berjalan.
+  - tombol untuk membuka Google Meet atau Interview AI di tab baru,
+  - tombol **Masuk** untuk membuka sesi dan langsung memajukan timeline ke tahap berikutnya.
+- **Pesan menunggu pengumuman** pada tahap pengumuman yang sedang berjalan: “Sedang menunggu pengumuman. Semoga Anda mendapatkan hasil yang terbaik.”
 
 ### Pengelolaan dan keamanan
 
@@ -64,9 +63,10 @@ Setiap lowongan memiliki timeline yang dapat berbeda. Contohnya, posisi Frontend
 5. Kandidat memilih CV, menulis cover letter, lalu mengirim lamaran.
 6. Sistem membuat lamaran dan menyalin timeline lowongan ke lamaran tersebut.
 7. Kandidat memantau progres melalui dashboard.
-8. Jika tahap saat ini adalah tes, kandidat mengirim file atau link jawaban.
-9. Admin memperbarui status tahap, jadwal, dan catatan melalui Supabase Table Editor.
-10. Kandidat melihat perubahan status pada timeline lamarannya.
+8. Jika tahap saat ini adalah tes, kandidat mengirim file atau link jawaban. Tahap langsung selesai dan tahap berikutnya terbuka.
+9. Jika tahap saat ini adalah interview, kandidat membuka Google Meet atau Interview AI, lalu menekan **Masuk**. Tahap interview selesai dan timeline lanjut.
+10. Saat tahap pengumuman menjadi aktif, kandidat melihat pesan menunggu pengumuman.
+11. Admin dapat memperbarui status akhir, jadwal, catatan, dan link interview melalui Supabase Table Editor.
 
 ## Peran Pengguna
 
@@ -75,7 +75,8 @@ Setiap lowongan memiliki timeline yang dapat berbeda. Contohnya, posisi Frontend
 - Membaca lowongan.
 - Membuat, mengunggah, dan memilih CV.
 - Mengirim lamaran.
-- Mengirim jawaban tes.
+- Mengirim jawaban tes berupa file atau link.
+- Membuka sesi interview dan menekan tombol Masuk.
 - Melihat timeline dan status lamaran miliknya sendiri.
 
 ### Admin
@@ -83,7 +84,8 @@ Setiap lowongan memiliki timeline yang dapat berbeda. Contohnya, posisi Frontend
 - Mengelola lowongan dan template timeline.
 - Melihat seluruh lamaran.
 - Memperbarui status tahap, jadwal, catatan, dan keputusan akhir.
-- Menandai tahap tertentu sebagai tes agar form jawaban muncul untuk kandidat.
+- Menandai tahap tertentu sebagai `test` agar form jawaban muncul untuk kandidat.
+- Mengatur link interview pada `application_stages.meeting_url` dan jenisnya pada `meeting_type` (`gmeet`, `ai`, atau `other`).
 
 ## Tech Stack
 
@@ -92,9 +94,10 @@ Setiap lowongan memiliki timeline yang dapat berbeda. Contohnya, posisi Frontend
 - **TypeScript**.
 - **Tailwind CSS v4**.
 - **Supabase**:
-  - Postgres untuk data lowongan, lamaran, CV, dan jawaban tes.
+  - Postgres untuk data lowongan, lamaran, CV, jawaban tes, dan link interview.
   - Auth untuk login Google.
   - Row Level Security untuk isolasi data kandidat.
+  - RPC untuk membuat lamaran, menyimpan jawaban tes, dan memajukan tahap interview.
 - **Supabase Edge Function** milik project Omahnalar (`uploadfile`) untuk upload file.
 - **Garage/S3** sebagai penyimpanan file CV dan jawaban tes.
 - **Zod** untuk validasi data di server.
@@ -108,10 +111,10 @@ Tabel utama:
 |---|---|
 | `profiles` | Profil kandidat/admin yang terhubung ke `auth.users` |
 | `jobs` | Detail lowongan, requirements, responsibilities, benefit, gaji, deadline |
-| `job_stages` | Template timeline per lowongan dan jenis tahapannya |
+| `job_stages` | Template timeline per lowongan, jenis tahap, dan link interview |
 | `candidate_cvs` | CV hasil builder atau hasil upload |
 | `applications` | Lamaran kandidat, snapshot CV, dan status keseluruhan |
-| `application_stages` | Salinan timeline untuk setiap lamaran |
+| `application_stages` | Salinan timeline untuk setiap lamaran, termasuk status, jadwal, dan link interview |
 | `stage_submissions` | File, link, dan catatan jawaban tes |
 
 Jenis tahapan pada `job_stages.kind` dan `application_stages.kind`:
@@ -120,15 +123,325 @@ Jenis tahapan pada `job_stages.kind` dan `application_stages.kind`:
 cv | test | interview | announcement | other
 ```
 
+Link interview disimpan di:
+
+```text
+meeting_type: gmeet | ai | other | null
+meeting_url:  URL Google Meet / platform Interview AI
+```
+
 Saat kandidat melamar, RPC `apply_to_job` akan:
 
 1. Memvalidasi lowongan dan CV milik kandidat.
 2. Mencegah lamaran duplikat untuk lowongan yang sama.
 3. Membuat row `applications`.
-4. Menyalin seluruh `job_stages` ke `application_stages`.
+4. Menyalin seluruh `job_stages` ke `application_stages`, termasuk `kind`, `meeting_type`, dan `meeting_url`.
 5. Menandai tahap pertama sebagai `completed` dan tahap kedua sebagai `current`.
 
-Jawaban tes disimpan satu kali per tahap di `stage_submissions`, lalu dapat diperbarui selama tahap tersebut masih `current`.
+RPC lain yang dipakai:
+
+- `submit_stage_answer` — menyimpan jawaban tes, menandai tahap tes selesai, lalu membuka tahap berikutnya.
+- `advance_interview_stage` — menandai tahap interview selesai saat kandidat menekan **Masuk**, lalu membuka tahap berikutnya.
+
+Jawaban tes disimpan satu kali per tahap di `stage_submissions` dan dibatasi oleh RLS.
+
+### Contoh alur demo
+
+```text
+1. Unggah CV       completed
+2. Tes Teknis      current → upload file/link → completed
+3. Interview HR    current → tombol Google Meet + Masuk → completed
+4. Interview User  current → tombol Interview AI + Masuk → completed
+5. Pengumuman      current → pesan menunggu pengumuman
+```
+
+## Diagram Sistem
+
+### Use Case Diagram
+
+Mermaid tidak memiliki notasi UML use case native, jadi use case digambarkan sebagai flowchart dengan aktor dan daftar use case.
+
+```mermaid
+flowchart LR
+    Kandidat([Kandidat])
+    Admin([Admin])
+
+    subgraph Publik["Area Publik"]
+        UC1([Melihat landing page])
+        UC2([Menjelajahi daftar lowongan])
+        UC3([Melihat detail dan requirements])
+    end
+
+    subgraph Akun["Akun Kandidat"]
+        UC4([Masuk dengan Google])
+        UC5([Membuat atau mengunggah CV])
+        UC6([Mengirim lamaran])
+        UC7([Mengirim jawaban tes])
+        UC8([Masuk sesi interview])
+        UC9([Memantau timeline lamaran])
+    end
+
+    subgraph Seleksi["Proses Seleksi"]
+        UC10([Menerima pesan menunggu pengumuman])
+        UC11([Melihat hasil akhir])
+    end
+
+    subgraph AdminArea["Area Admin"]
+        UC12([Mengelola lowongan dan template timeline])
+        UC13([Mengatur jadwal dan link interview])
+        UC14([Memperbarui status dan keputusan akhir])
+    end
+
+    Kandidat --> UC1
+    Kandidat --> UC2
+    Kandidat --> UC3
+    Kandidat --> UC4
+    Kandidat --> UC5
+    Kandidat --> UC6
+    Kandidat --> UC7
+    Kandidat --> UC8
+    Kandidat --> UC9
+    Kandidat --> UC10
+    Kandidat --> UC11
+
+    Admin --> UC12
+    Admin --> UC13
+    Admin --> UC14
+```
+
+### Class Diagram
+
+```mermaid
+classDiagram
+    class Profile {
+        +UUID id
+        +string email
+        +string fullName
+        +string avatarUrl
+        +Role role
+    }
+
+    class Job {
+        +UUID id
+        +string slug
+        +string title
+        +string team
+        +string location
+        +string employmentType
+        +string summary
+        +string description
+        +string requirements
+        +string responsibilities
+        +string benefits
+        +string salaryRange
+        +date deadline
+        +boolean isOpen
+    }
+
+    class JobStage {
+        +UUID id
+        +string title
+        +string description
+        +StageKind kind
+        +string meetingType
+        +string meetingUrl
+        +int sortOrder
+    }
+
+    class CandidateCV {
+        +UUID id
+        +string title
+        +CvSource source
+        +string fileUrl
+        +json data
+        +datetime updatedAt
+    }
+
+    class Application {
+        +UUID id
+        +string cvTitle
+        +CvSource cvSource
+        +string cvFileUrl
+        +string coverLetter
+        +ApplicationStatus status
+        +datetime createdAt
+    }
+
+    class ApplicationStage {
+        +UUID id
+        +string title
+        +StageKind kind
+        +string meetingType
+        +string meetingUrl
+        +int sortOrder
+        +StageStatus status
+        +datetime scheduledStart
+        +datetime scheduledEnd
+        +string note
+        +datetime completedAt
+    }
+
+    class StageSubmission {
+        +UUID id
+        +string fileUrl
+        +string linkUrl
+        +string note
+        +datetime submittedAt
+    }
+
+    class Role {
+        <<enumeration>>
+        candidate
+        admin
+    }
+
+    class StageKind {
+        <<enumeration>>
+        cv
+        test
+        interview
+        announcement
+        other
+    }
+
+    class ApplicationStatus {
+        <<enumeration>>
+        in_progress
+        accepted
+        rejected
+        withdrawn
+    }
+
+    class StageStatus {
+        <<enumeration>>
+        locked
+        current
+        completed
+        rejected
+    }
+
+    class CvSource {
+        <<enumeration>>
+        upload
+        builder
+    }
+
+    Profile "1" --> "*" CandidateCV : memiliki
+    Profile "1" --> "*" Application : mengirim
+    Job "1" --> "*" JobStage : mendefinisikan
+    Job "1" --> "*" Application : menerima
+    CandidateCV "1" --> "*" Application : digunakan pada
+    Application "1" --> "*" ApplicationStage : memiliki timeline
+    ApplicationStage "1" --> "0..1" StageSubmission : memiliki jawaban
+    JobStage "1" ..> "*" ApplicationStage : disalin saat melamar
+    Profile --> Role
+    JobStage --> StageKind
+    ApplicationStage --> StageKind
+    ApplicationStage --> StageStatus
+    Application --> ApplicationStatus
+    CandidateCV --> CvSource
+    Application --> CvSource
+```
+
+### Sequence Diagram
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Kandidat
+    participant UI as Next.js UI
+    participant SA as Server Action
+    participant Auth as Supabase Auth
+    participant DB as Supabase Postgres
+    participant EF as Edge Function Upload
+    participant GS as Garage Storage
+
+    Kandidat->>UI: Buka daftar lowongan
+    UI->>DB: Query jobs dan job_stages
+    DB-->>UI: Data lowongan dan timeline
+
+    Kandidat->>UI: Klik Lamar
+    UI->>Auth: Cek sesi Google
+    Auth-->>UI: User terautentikasi
+
+    alt CV baru diunggah
+        Kandidat->>UI: Pilih file CV
+        UI->>EF: POST /uploadfile
+        EF->>GS: Simpan file
+        GS-->>EF: URL file
+        EF-->>UI: url dan fileName
+        UI->>DB: Insert candidate_cvs
+    else CV sudah tersimpan
+        Kandidat->>UI: Pilih CV
+    end
+
+    Kandidat->>UI: Kirim lamaran
+    UI->>SA: applyToJob()
+    SA->>DB: RPC apply_to_job
+    DB->>DB: Buat application dan salin timeline
+    DB-->>SA: application_id
+    SA-->>UI: Redirect ke timeline
+
+    Kandidat->>UI: Isi form tes
+    opt Upload file jawaban
+        UI->>EF: POST file jawaban
+        EF->>GS: Simpan file
+        GS-->>EF: URL file
+        EF-->>UI: url
+    end
+    UI->>SA: submitStage()
+    SA->>DB: RPC submit_stage_answer
+    DB->>DB: Simpan jawaban, tes completed, next stage current
+    DB-->>SA: application_id
+    SA-->>UI: Redirect ke timeline
+
+    Kandidat->>UI: Klik Masuk interview
+    UI->>SA: enterInterview()
+    SA->>DB: RPC advance_interview_stage
+    DB->>DB: Interview completed, next stage current
+    DB-->>SA: application_id
+    SA-->>UI: Redirect ke timeline
+
+    Note over Kandidat,UI: Jika tahap pengumuman aktif, tampil pesan menunggu pengumuman
+```
+
+### Flowchart
+
+```mermaid
+flowchart TD
+    A([Mulai]) --> B[Landing page]
+    B --> C[Lihat daftar lowongan]
+    C --> D[Detail lowongan dan timeline]
+    D --> E{Sudah login?}
+    E -- Belum --> F[Login Google]
+    F --> G{Sudah punya CV?}
+    E -- Sudah --> G
+    G -- Belum --> H[Buat CV atau upload PDF]
+    G -- Sudah --> I[Pilih CV dan kirim lamaran]
+    H --> I
+    I --> J[Sistem menyalin timeline ke lamaran]
+    J --> K[Dashboard kandidat]
+    K --> L{Tahap saat ini?}
+
+    L -- Tes --> M[Upload file atau link jawaban]
+    M --> N[RPC submit_stage_answer]
+    N --> O[Tahap selesai dan tahap berikutnya aktif]
+
+    L -- Interview --> P[Buka Google Meet atau Interview AI]
+    P --> Q[Klik Masuk]
+    Q --> R[RPC advance_interview_stage]
+    R --> O
+
+    L -- Pengumuman --> S[Tampil pesan menunggu pengumuman]
+    L -- Tahap lain --> T[Menunggu pembaruan admin]
+
+    O --> K
+    T --> K
+
+    S --> U{Keputusan admin}
+    U -- Diterima --> V([Diterima])
+    U -- Ditolak --> W([Tidak lolos])
+```
 
 ## Halaman dan Rute
 
@@ -139,7 +452,7 @@ Jawaban tes disimpan satu kali per tahap di `stage_submissions`, lalu dapat dipe
 /masuk                    Login Google
 /lamar/[slug]             Form lamaran
 /dashboard                Ringkasan dan daftar lamaran
-/dashboard/lamaran/[id]   Timeline dan form jawaban tes
+/dashboard/lamaran/[id]   Timeline, jawaban tes, dan aksi interview
 /dashboard/cv             Daftar CV
 /dashboard/cv/baru        Buat CV baru
 /dashboard/cv/[id]        Edit dan cetak CV
@@ -157,7 +470,7 @@ app/
 ├── dashboard/
 │   ├── page.tsx                 # Ringkasan lamaran
 │   ├── cv/                      # CV builder dan daftar CV
-│   └── lamaran/[id]/            # Timeline dan jawaban tes
+│   └── lamaran/[id]/            # Timeline, form tes, dan aksi interview
 └── components/                  # Header, card, form, preview CV, ikon
 
 lib/
@@ -184,8 +497,10 @@ proxy.ts                         # Refresh sesi dan proteksi route
 - **URL file disimpan di database**, bukan path Supabase Storage.
 - **Timeline disalin saat melamar** agar riwayat seleksi tetap konsisten.
 - **Jenis tahapan eksplisit** (`kind`) menentukan kapan form jawaban tes muncul.
-- **RLS dan RPC** membatasi akses data; kandidat tidak dapat mengubah status lamarannya sendiri.
+- **RLS dan RPC** membatasi akses data; kandidat tidak dapat mengubah status secara langsung. Perubahan status hanya terjadi lewat RPC yang memvalidasi kepemilikan dan tahap aktif.
 - **Jawaban tes otomatis lolos di mode demo**: RPC `submit_stage_answer` menyimpan jawaban, menandai tahap tes selesai, lalu membuka tahap berikutnya tanpa review admin.
+- **Interview otomatis selesai saat tombol Masuk ditekan**: RPC `advance_interview_stage` memajukan timeline tanpa menunggu admin.
+- **Link interview fleksibel per tahap**: `meeting_type` menentukan label tombol, `meeting_url` menentukan tujuan link.
 - **Data awal di-seed lewat SQL**, sehingga alur kandidat bisa diuji sebelum dashboard admin dibuat.
 - **Palet biru solid tanpa gradient**, konsisten di landing page dan portal.
 
