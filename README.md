@@ -38,7 +38,8 @@ Setiap lowongan memiliki timeline yang dapat berbeda. Contohnya, posisi Frontend
   - upload file PDF, DOC, DOCX, ZIP, PNG, atau JPG,
   - mengirim link jawaban,
   - menambahkan catatan,
-  - memperbarui jawaban selama tahap masih berjalan.
+  - memperbarui jawaban selama tahap masih berjalan,
+  - otomatis menyelesaikan tahap tes dan membuka tahap berikutnya (mode demo).
 
 ### Pengelolaan dan keamanan
 
@@ -180,6 +181,7 @@ proxy.ts                         # Refresh sesi dan proteksi route
 - **Timeline disalin saat melamar** agar riwayat seleksi tetap konsisten.
 - **Jenis tahapan eksplisit** (`kind`) menentukan kapan form jawaban tes muncul.
 - **RLS dan RPC** membatasi akses data; kandidat tidak dapat mengubah status lamarannya sendiri.
+- **Jawaban tes otomatis lolos di mode demo**: RPC `submit_stage_answer` menyimpan jawaban, menandai tahap tes selesai, lalu membuka tahap berikutnya tanpa review admin.
 - **Data awal di-seed lewat SQL**, sehingga alur kandidat bisa diuji sebelum dashboard admin dibuat.
 - **Palet biru solid tanpa gradient**, konsisten di landing page dan portal.
 
@@ -188,6 +190,7 @@ proxy.ts                         # Refresh sesi dan proteksi route
 - Dashboard admin belum tersedia; pengelolaan lowongan, timeline, dan progres dilakukan melalui Supabase Table Editor.
 - Export CV mengandalkan dialog print browser, belum menghasilkan PDF langsung di server.
 - File upload memakai layanan bersama Omahnalar dan mengembalikan URL file. Untuk kebutuhan produksi yang lebih ketat, file sebaiknya dipindahkan ke storage privat dengan signed URL.
+- Semua jawaban tes dianggap lolos dan langsung memajukan timeline karena ini mode demo.
 - Belum ada notifikasi email otomatis untuk perubahan status lamaran.
 - Belum ada rate limit atau CAPTCHA pada form upload dan lamaran.
 

@@ -47,41 +47,24 @@ export async function submitStage(
     };
   }
 
-  const { data: stage } = await supabase
-    .from("application_stages")
-    .select("id, application_id, kind, status")
-    .eq("id", parsed.data.stageId)
-    .maybeSingle();
-
-  if (!stage) {
-    return { error: "Tahapan tidak ditemukan." };
-  }
-
-  if (stage.kind !== "test") {
-    return { error: "Tahapan ini tidak menerima jawaban tes." };
-  }
-
-  if (stage.status !== "current") {
-    return { error: "Tahapan ini sudah tidak bisa diisi." };
-  }
-
-  const { error } = await supabase.from("stage_submissions").upsert(
+  const { data: applicationId, error } = await supabase.rpc(
+    "submit_stage_answer",
     {
-      application_stage_id: stage.id,
-      application_id: stage.application_id,
-      user_id: user.id,
-      file_url: parsed.data.fileUrl || null,
-      link_url: parsed.data.linkUrl || null,
-      note: parsed.data.note || null,
-      submitted_at: new Date().toISOString(),
+      p_stage_id: parsed.data.stageId,
+      p_file_url: parsed.data.fileUrl || null,
+      p_link_url: parsed.data.linkUrl || null,
+      p_note: parsed.data.note || null,
     },
-    { onConflict: "application_stage_id" },
   );
 
-  if (error) {
-    return { error: "Jawaban gagal disimpan. Silakan coba lagi." };
+  if (error || !applicationId) {
+    return {
+      error:
+        error?.message ??
+        "Jawaban gagal disimpan. Silakan coba lagi.",
+    };
   }
 
-  revalidatePath(`/dashboard/lamaran/${stage.application_id}`);
-  redirect(`/dashboard/lamaran/${stage.application_id}?submitted=1`);
+  revalidatePath(`/dashboard/lamaran/${applicationId}`);
+  redirect(`/dashboard/lamaran/${applicationId}?submitted=1`);
 }

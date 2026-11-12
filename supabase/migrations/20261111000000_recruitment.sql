@@ -439,6 +439,104 @@ revoke all on function public.apply_to_job(uuid, uuid, text) from public, anon;
 grant execute on function public.apply_to_job(uuid, uuid, text) to authenticated;
 
 -- ---------------------------------------------------------------------------
+-- Submit jawaban tes + otomatis lanjut ke tahap berikutnya.
+-- Mode demo: setiap jawaban dianggap lolos.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.submit_stage_answer(
+  p_stage_id uuid,
+  p_file_url text,
+  p_link_url text,
+  p_note text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_stage public.application_stages%rowtype;
+begin
+  if v_user_id is null then
+    raise exception 'Kamu harus masuk terlebih dahulu.';
+  end if;
+
+  if coalesce(
+    nullif(trim(p_file_url), ''),
+    nullif(trim(p_link_url), '')
+  ) is null then
+    raise exception 'Unggah file atau isi link jawaban terlebih dahulu.';
+  end if;
+
+  select s.* into v_stage
+  from public.application_stages s
+  join public.applications a on a.id = s.application_id
+  where s.id = p_stage_id
+    and a.user_id = v_user_id
+    and s.kind = 'test'
+    and s.status = 'current';
+
+  if not found then
+    raise exception 'Tahap tes tidak tersedia atau sudah selesai.';
+  end if;
+
+  insert into public.stage_submissions (
+    application_stage_id,
+    application_id,
+    user_id,
+    file_url,
+    link_url,
+    note,
+    submitted_at
+  )
+  values (
+    v_stage.id,
+    v_stage.application_id,
+    v_user_id,
+    nullif(trim(p_file_url), ''),
+    nullif(trim(p_link_url), ''),
+    nullif(trim(p_note), ''),
+    now()
+  )
+  on conflict (application_stage_id) do update
+  set
+    file_url = excluded.file_url,
+    link_url = excluded.link_url,
+    note = excluded.note,
+    submitted_at = now();
+
+  -- Demo: jawaban dianggap lolos, tahap ini langsung selesai.
+  update public.application_stages
+  set
+    status = 'completed',
+    completed_at = now()
+  where id = v_stage.id;
+
+  -- Buka tahap berikutnya.
+  update public.application_stages
+  set status = 'current'
+  where id = (
+    select id
+    from public.application_stages
+    where application_id = v_stage.application_id
+      and status = 'locked'
+      and sort_order > v_stage.sort_order
+    order by sort_order
+    limit 1
+  );
+
+  return v_stage.application_id;
+end;
+$$;
+
+revoke all on function public.submit_stage_answer(uuid, text, text, text)
+  from public, anon;
+
+grant execute on function public.submit_stage_answer(uuid, text, text, text)
+  to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- RLS
 -- ---------------------------------------------------------------------------
 
