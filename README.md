@@ -1,186 +1,201 @@
 # SekolahKarir — Portal Karier
 
-Landing page rekrutmen dan portal kandidat untuk **SekolahKarir**. Kandidat bisa melihat lowongan, membuat atau mengunggah CV, melamar, lalu memantau timeline seleksi. Dibangun dengan Next.js App Router, React, Tailwind CSS, dan Supabase.
+Landing page rekrutmen dan portal kandidat untuk **SekolahKarir**, sebuah platform yang membantu siswa, sekolah, dan dunia kerja saling terhubung. Project ini mencakup proses dari mengenal lowongan, menyiapkan CV, mengirim lamaran, sampai memantau setiap tahap seleksi.
+
+Tampilan menggunakan palet biru solid tanpa gradient, dengan layout responsif untuk desktop dan mobile.
+
+## Tentang Project
+
+SekolahKarir ingin membuat proses rekrutmen terasa lebih transparan. Kandidat tidak hanya melihat daftar lowongan, tetapi juga memahami persyaratan, mengirim CV, dan mengetahui posisinya dalam proses seleksi.
+
+Setiap lowongan memiliki timeline yang dapat berbeda. Contohnya, posisi Frontend Engineer melewati tes teknis, interview HR, dan interview user, sedangkan Product Designer melewati review portofolio dan studi kasus. Timeline tersebut dibuat dari template tahapan milik masing-masing lowongan, lalu disalin ke lamaran kandidat saat melamar.
 
 ## Fitur
 
-- **Daftar lowongan** di `/karier` dengan pencarian dan filter tim/lokasi.
-- **Detail lowongan** berisi deskripsi, requirements, responsibilities, benefit, gaji, deadline, dan preview tahapan.
-- **Login Google** melalui Supabase Auth.
-- **CV builder** di `/dashboard/cv` dengan pratinjau A4 dan cetak/simpan PDF.
-- **Upload CV PDF** lewat Edge Function Omahnalar `uploadfile` yang sudah ada.
+### Halaman publik
+
+- **Landing page rekrutmen** dengan headline, role cards, CTA, benefit, dan informasi budaya kerja.
+- **Daftar lowongan** di `/karier` dengan pencarian serta filter tim dan lokasi.
+- **Detail lowongan** berisi deskripsi, requirements, responsibilities, benefit, rentang gaji, deadline, dan preview timeline seleksi.
+- **Login dengan Google** melalui Supabase Auth.
+- CTA lamaran dan CV spontan.
+
+### Portal kandidat
+
+- **Dashboard kandidat** berisi ringkasan jumlah lamaran, lamaran yang sedang diproses, dan lamaran yang sudah memiliki keputusan.
+- **Daftar lamaran** dengan status keseluruhan, tahap saat ini, progress bar, dan ringkasan timeline.
+- **Detail timeline lamaran** dengan status:
+  - selesai,
+  - saat ini,
+  - terkunci,
+  - tidak lolos.
+- **Jadwal dan catatan admin** ditampilkan pada tahap yang relevan.
+- **CV builder** untuk membuat CV terstruktur langsung di portal.
+- **Pratinjau CV format A4** dan cetak/simpan sebagai PDF melalui browser.
+- **Upload CV PDF** untuk melengkapi CV yang sudah dibuat di luar aplikasi.
 - **Form lamaran** dengan pilihan CV tersimpan atau upload baru, plus cover letter.
-- **Dashboard kandidat** berisi daftar lamaran dan progres tahap saat ini.
-- **Timeline per lamaran** dengan status selesai, saat ini, terkunci, atau tidak lolos, lengkap dengan jadwal dan catatan admin.
-- **Form jawaban tes** pada tahap bertipe `test`: kandidat bisa upload file atau mengirim link, lalu jawaban disimpan di `stage_submissions`.
-- **Timeline berbeda per lowongan**, karena setiap job punya template `job_stages` sendiri.
-- **RLS** untuk melindungi data lamaran, CV, dan jawaban tes.
+- **Form jawaban tes** pada tahap bertipe tes:
+  - upload file PDF, DOC, DOCX, ZIP, PNG, atau JPG,
+  - mengirim link jawaban,
+  - menambahkan catatan,
+  - memperbarui jawaban selama tahap masih berjalan.
 
-## Stack
+### Pengelolaan dan keamanan
 
-- Next.js 16 (App Router, Server Actions, Proxy)
-- React 19
-- Tailwind CSS v4
-- Supabase: Postgres, Auth, Edge Functions (Omahnalar `uploadfile`)
-- Garage/S3 sebagai penyimpanan file CV
-- Zod untuk validasi
+- **Template timeline per lowongan** melalui tabel `job_stages`.
+- **Timeline snapshot per lamaran** melalui tabel `application_stages`, sehingga perubahan template tidak mengubah riwayat lamaran yang sudah berjalan.
+- **Jawaban tes per tahap** disimpan di `stage_submissions`.
+- **RLS (Row Level Security)** untuk membatasi akses kandidat ke data miliknya sendiri.
+- **Role admin** untuk membaca seluruh lamaran dan memperbarui progres.
+- **Validasi input** menggunakan Zod.
+- **Seed data** berisi enam lowongan dengan requirements dan timeline yang berbeda-beda.
 
-## Menjalankan project
+## Alur Pengguna
 
-```bash
-npm install
-npm run dev
-```
+1. Kandidat membuka landing page dan menjelajahi lowongan.
+2. Kandidat membaca detail lowongan, requirements, dan tahapan seleksi.
+3. Kandidat masuk menggunakan akun Google.
+4. Kandidat membuat CV di portal atau mengunggah CV PDF.
+5. Kandidat memilih CV, menulis cover letter, lalu mengirim lamaran.
+6. Sistem membuat lamaran dan menyalin timeline lowongan ke lamaran tersebut.
+7. Kandidat memantau progres melalui dashboard.
+8. Jika tahap saat ini adalah tes, kandidat mengirim file atau link jawaban.
+9. Admin memperbarui status tahap, jadwal, dan catatan melalui Supabase Table Editor.
+10. Kandidat melihat perubahan status pada timeline lamarannya.
 
-Buka [http://localhost:3000](http://localhost:3000).
+## Peran Pengguna
 
-Environment sudah tersedia di `.env.local`:
+### Kandidat
 
-```bash
-NEXT_PUBLIC_SUPABASE_URL=https://mxdktjhxcqexqbjhyeei.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
-NEXT_PUBLIC_UPLOAD_FUNCTION_URL=https://bhalfkibqlsiiysqksnn.supabase.co/functions/v1/uploadfile
-NEXT_PUBLIC_UPLOAD_FUNCTION_KEY=<anon-key-project-omahnalar>
-```
+- Membaca lowongan.
+- Membuat, mengunggah, dan memilih CV.
+- Mengirim lamaran.
+- Mengirim jawaban tes.
+- Melihat timeline dan status lamaran miliknya sendiri.
 
-Tidak ada service role key di aplikasi Next.js. Upload file memakai Edge Function Omahnalar yang sudah ada, sedangkan pembuatan lamaran memakai RPC dengan JWT user.
+### Admin
 
-## 1. Jalankan migration
+- Mengelola lowongan dan template timeline.
+- Melihat seluruh lamaran.
+- Memperbarui status tahap, jadwal, catatan, dan keputusan akhir.
+- Menandai tahap tertentu sebagai tes agar form jawaban muncul untuk kandidat.
 
-Buka **Supabase Dashboard → SQL Editor → New query**, lalu jalankan seluruh isi:
+## Tech Stack
+
+- **Next.js 16** dengan App Router, Server Components, Server Actions, dan Proxy.
+- **React 19**.
+- **TypeScript**.
+- **Tailwind CSS v4**.
+- **Supabase**:
+  - Postgres untuk data lowongan, lamaran, CV, dan jawaban tes.
+  - Auth untuk login Google.
+  - Row Level Security untuk isolasi data kandidat.
+- **Supabase Edge Function** milik project Omahnalar (`uploadfile`) untuk upload file.
+- **Garage/S3** sebagai penyimpanan file CV dan jawaban tes.
+- **Zod** untuk validasi data di server.
+- **Geist** sebagai font utama.
+
+## Arsitektur Data
+
+Tabel utama:
+
+| Tabel | Fungsi |
+|---|---|
+| `profiles` | Profil kandidat/admin yang terhubung ke `auth.users` |
+| `jobs` | Detail lowongan, requirements, responsibilities, benefit, gaji, deadline |
+| `job_stages` | Template timeline per lowongan dan jenis tahapannya |
+| `candidate_cvs` | CV hasil builder atau hasil upload |
+| `applications` | Lamaran kandidat, snapshot CV, dan status keseluruhan |
+| `application_stages` | Salinan timeline untuk setiap lamaran |
+| `stage_submissions` | File, link, dan catatan jawaban tes |
+
+Jenis tahapan pada `job_stages.kind` dan `application_stages.kind`:
 
 ```text
-supabase/migrations/20261111000000_recruitment.sql
+cv | test | interview | announcement | other
 ```
 
-Migration membuat:
+Saat kandidat melamar, RPC `apply_to_job` akan:
 
-- `profiles`, `jobs`, `job_stages`, `candidate_cvs`, `applications`, `application_stages`, `stage_submissions`
-- trigger profil otomatis saat user Google pertama kali masuk
-- RLS dan policy admin
-- RPC `apply_to_job` yang membuat lamaran dan menyalin timeline secara atomik
-- seed 6 lowongan dengan timeline yang berbeda-beda
+1. Memvalidasi lowongan dan CV milik kandidat.
+2. Mencegah lamaran duplikat untuk lowongan yang sama.
+3. Membuat row `applications`.
+4. Menyalin seluruh `job_stages` ke `application_stages`.
+5. Menandai tahap pertama sebagai `completed` dan tahap kedua sebagai `current`.
 
-> Ini schema awal. Jika sebelumnya sudah pernah menjalankan migration versi lain, gunakan database development yang bersih agar tidak ada konflik kolom.
+Jawaban tes disimpan satu kali per tahap di `stage_submissions`, lalu dapat diperbarui selama tahap tersebut masih `current`.
 
-## 2. Konfigurasi Google OAuth
-
-Di **Google Cloud Console**:
-
-1. Buat OAuth Client ID tipe **Web application**.
-2. Authorized JavaScript origins:
-   - `http://localhost:3000`
-   - domain production kamu
-3. Authorized redirect URI:
-   - `https://mxdktjhxcqexqbjhyeei.supabase.co/auth/v1/callback`
-
-Di **Supabase Dashboard**:
-
-1. **Authentication → Providers → Google**: aktifkan, lalu isi Client ID dan Client Secret dari Google.
-2. **Authentication → URL Configuration**:
-   - Site URL: `http://localhost:3000`
-   - Redirect URLs: `http://localhost:3000/auth/callback` dan URL production.
-
-Setelah login pertama, user otomatis mendapat profil dengan role `candidate`.
-
-## 3. Upload CV memakai Edge Function Omahnalar
-
-Tidak ada Edge Function baru. Aplikasi memakai function yang sudah ada di project Omahnalar:
+## Halaman dan Rute
 
 ```text
-https://bhalfkibqlsiiysqksnn.supabase.co/functions/v1/uploadfile
+/                         Landing page rekrutmen
+/karier                   Daftar lowongan
+/karier/[slug]            Detail lowongan
+/masuk                    Login Google
+/lamar/[slug]             Form lamaran
+/dashboard                Ringkasan dan daftar lamaran
+/dashboard/lamaran/[id]   Timeline dan form jawaban tes
+/dashboard/cv             Daftar CV
+/dashboard/cv/baru        Buat CV baru
+/dashboard/cv/[id]        Edit dan cetak CV
 ```
 
-Tambahkan dua environment berikut:
-
-```bash
-NEXT_PUBLIC_UPLOAD_FUNCTION_URL=https://bhalfkibqlsiiysqksnn.supabase.co/functions/v1/uploadfile
-NEXT_PUBLIC_UPLOAD_FUNCTION_KEY=<anon-key-project-omahnalar>
-```
-
-Cara kerja upload mengikuti pola upload gambar di project Omahnalar:
-
-1. User memilih file lewat input tersembunyi.
-2. File divalidasi di client (PDF, maksimal 5 MB).
-3. File dikirim sebagai `FormData` ke URL function.
-4. Header berisi `Authorization: Bearer <anon-key-omahnalar>` dan `apikey: <anon-key-omahnalar>`.
-5. Function mengunggah file ke Garage dan mengembalikan `{ url, fileName }`.
-6. Aplikasi menyimpan URL tersebut ke `candidate_cvs.file_url` milik user yang sedang login.
-
-Function ini mengembalikan URL file, bukan path Supabase Storage. Karena itu schema menggunakan kolom `file_url` dan tidak membutuhkan bucket `cv`.
-
-## 4. Menjadikan admin
-
-Login dengan akun Google yang akan dijadikan admin, lalu jalankan di SQL Editor:
-
-```sql
-update public.profiles
-set role = 'admin'
-where email = 'email-admin@gmail.com';
-```
-
-Saat ini pengelolaan lowongan, timeline, dan progres lamaran dilakukan lewat **Table Editor** Supabase. Dashboard admin belum dibuat.
-
-Untuk menampilkan form jawaban tes pada suatu tahap, set kolom `kind` di `job_stages` atau `application_stages` menjadi `test`. Tahap tersebut juga harus berstatus `current` agar kandidat bisa mengirim jawaban. Jenis lain yang tersedia: `cv`, `interview`, `announcement`, dan `other`.
-
-Contoh memperbarui progres lamaran:
-
-```sql
--- Selesaikan tahap saat ini
-update public.application_stages
-set status = 'completed', completed_at = now(), note = 'Tes sudah dikirim.'
-where application_id = 'APPLICATION_ID' and sort_order = 2;
-
--- Buka tahap berikutnya
-update public.application_stages
-set status = 'current',
-    scheduled_start = '2026-12-01 09:00+07',
-    scheduled_end = '2026-12-01 10:00+07',
-    note = 'Jadwal interview HR.'
-where application_id = 'APPLICATION_ID' and sort_order = 3;
-
--- Status keseluruhan
-update public.applications
-set status = 'accepted'
-where id = 'APPLICATION_ID';
-```
-
-## Struktur utama
+## Struktur Project
 
 ```text
 app/
-├── page.tsx                         # Landing page
-├── karier/                          # Daftar dan detail lowongan
-├── lamar/[slug]/                    # Form lamaran + server action
-├── masuk/                           # Login Google
-├── auth/                            # Callback OAuth dan sign out
+├── page.tsx                     # Landing page
+├── karier/                      # Daftar dan detail lowongan
+├── lamar/[slug]/                # Form lamaran dan server action
+├── masuk/                       # Login Google
+├── auth/                        # Callback OAuth dan sign out
 ├── dashboard/
-│   ├── page.tsx                     # Ringkasan lamaran
-│   ├── cv/                          # CV builder dan daftar CV
-│   └── lamaran/[id]/                # Timeline detail
-└── components/                      # Header, card, form, preview CV, ikon
+│   ├── page.tsx                 # Ringkasan lamaran
+│   ├── cv/                      # CV builder dan daftar CV
+│   └── lamaran/[id]/            # Timeline dan jawaban tes
+└── components/                  # Header, card, form, preview CV, ikon
 
-lib/supabase/                        # Client browser, server, proxy, auth helper
-lib/jobs.ts                          # Query lowongan publik
-lib/cv.ts                            # Tipe dan validasi CV
-services/cv-upload.ts                # Client upload ke Edge Function Omahnalar
-supabase/migrations/                 # Schema + seed
+lib/
+├── supabase/                    # Client browser, server, proxy, auth helper
+├── jobs.ts                      # Query lowongan publik
+├── cv.ts                        # Tipe dan validasi CV
+├── format.ts                    # Format tanggal
+└── types.ts                     # Tipe domain
+
+services/
+├── file-upload.ts               # Upload generik ke Edge Function Omahnalar
+└── cv-upload.ts                 # Upload CV + simpan metadata
+
+supabase/migrations/             # Schema, RLS, RPC, dan seed data
+proxy.ts                         # Refresh sesi dan proteksi route
 ```
 
-## Keputusan utama
+## Keputusan Implementasi
 
 - **Google OAuth** dipilih agar kandidat tidak perlu mengelola password.
-- **CV builder sendiri** menyimpan data terstruktur di `candidate_cvs.data` (JSONB), sehingga bisa dipakai ulang. Export PDF memakai print browser untuk tahap ini.
-- **Upload CV memakai Edge Function Omahnalar `uploadfile`** yang sudah ada. File disimpan di Garage, lalu URL-nya disimpan di `candidate_cvs.file_url`.
-- **Timeline disalin saat melamar** ke `application_stages`. Perubahan template lowongan di kemudian hari tidak mengubah riwayat pelamar.
-- **Seed SQL dulu** untuk data lowongan dan dummy timeline. Admin dashboard bisa ditambahkan setelah alur kandidat stabil.
-- **Palet biru solid, tanpa gradient**, konsisten dengan landing page.
-- **Tanpa service role di Next.js**; akses data dibatasi RLS dan RPC. Upload memakai Edge Function Omahnalar.
+- **CV builder sendiri** menyimpan data terstruktur dalam kolom JSONB, sehingga CV dapat diedit dan dipakai ulang.
+- **Export PDF memakai print browser** untuk menjaga implementasi tetap ringan.
+- **File upload memakai Edge Function yang sudah ada** di project Omahnalar, bukan membuat function baru.
+- **URL file disimpan di database**, bukan path Supabase Storage.
+- **Timeline disalin saat melamar** agar riwayat seleksi tetap konsisten.
+- **Jenis tahapan eksplisit** (`kind`) menentukan kapan form jawaban tes muncul.
+- **RLS dan RPC** membatasi akses data; kandidat tidak dapat mengubah status lamarannya sendiri.
+- **Data awal di-seed lewat SQL**, sehingga alur kandidat bisa diuji sebelum dashboard admin dibuat.
+- **Palet biru solid tanpa gradient**, konsisten di landing page dan portal.
 
-## Catatan produksi
+## Batasan Saat Ini
 
-- Edge Function Omahnalar mengembalikan URL file dari Garage. URL tersebut dapat diakses publik, jadi jangan simpan dokumen sensitif di sana tanpa proteksi tambahan.
-- Function upload dipakai bersama project Omahnalar. Pertimbangkan membuat versi privat atau signed URL jika CV harus benar-benar rahasia.
-- Tambahkan rate limit atau Turnstile pada endpoint upload dan form lamaran.
-- Pertimbangkan antivirus/scan file sebelum produksi.
-- Tambahkan dashboard admin untuk mengelola lowongan, timeline, dan status lamaran.
+- Dashboard admin belum tersedia; pengelolaan lowongan, timeline, dan progres dilakukan melalui Supabase Table Editor.
+- Export CV mengandalkan dialog print browser, belum menghasilkan PDF langsung di server.
+- File upload memakai layanan bersama Omahnalar dan mengembalikan URL file. Untuk kebutuhan produksi yang lebih ketat, file sebaiknya dipindahkan ke storage privat dengan signed URL.
+- Belum ada notifikasi email otomatis untuk perubahan status lamaran.
+- Belum ada rate limit atau CAPTCHA pada form upload dan lamaran.
+
+## Pengembangan Lanjutan
+
+- Dashboard admin untuk CRUD lowongan, timeline, dan progres lamaran.
+- Notifikasi email saat status berubah atau jadwal interview ditetapkan.
+- Penyimpanan CV privat dengan signed URL.
+- Rate limit dan CAPTCHA pada endpoint upload serta form lamaran.
+- Tes otomatis, penilaian jawaban, dan riwayat revisi jawaban.
+- Filter dan pencarian lanjutan pada daftar lamaran admin.
