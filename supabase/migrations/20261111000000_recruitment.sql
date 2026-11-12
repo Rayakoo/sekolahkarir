@@ -137,6 +137,8 @@ create table if not exists public.job_stages (
   kind text not null default 'other' check (
     kind in ('cv', 'test', 'interview', 'announcement', 'other')
   ),
+  meeting_type text check (meeting_type in ('gmeet', 'ai', 'other')),
+  meeting_url text,
   sort_order int not null,
   created_at timestamptz not null default now(),
   unique (job_id, sort_order)
@@ -144,6 +146,12 @@ create table if not exists public.job_stages (
 
 alter table public.job_stages
   add column if not exists kind text not null default 'other';
+
+alter table public.job_stages
+  add column if not exists meeting_type text;
+
+alter table public.job_stages
+  add column if not exists meeting_url text;
 
 alter table public.job_stages
   drop constraint if exists job_stages_kind_check;
@@ -230,6 +238,8 @@ create table if not exists public.application_stages (
   kind text not null default 'other' check (
     kind in ('cv', 'test', 'interview', 'announcement', 'other')
   ),
+  meeting_type text check (meeting_type in ('gmeet', 'ai', 'other')),
+  meeting_url text,
   sort_order int not null,
   status public.stage_status not null default 'locked',
   scheduled_start timestamptz,
@@ -243,6 +253,12 @@ create table if not exists public.application_stages (
 
 alter table public.application_stages
   add column if not exists kind text not null default 'other';
+
+alter table public.application_stages
+  add column if not exists meeting_type text;
+
+alter table public.application_stages
+  add column if not exists meeting_url text;
 
 alter table public.application_stages
   drop constraint if exists application_stages_kind_check;
@@ -408,6 +424,8 @@ begin
       title,
       description,
       kind,
+      meeting_type,
+      meeting_url,
       sort_order,
       status,
       completed_at
@@ -417,6 +435,8 @@ begin
       v_stage.title,
       v_stage.description,
       v_stage.kind,
+      v_stage.meeting_type,
+      v_stage.meeting_url,
       v_stage.sort_order,
       case
         when v_position = 1 then 'completed'::public.stage_status
@@ -534,6 +554,66 @@ revoke all on function public.submit_stage_answer(uuid, text, text, text)
   from public, anon;
 
 grant execute on function public.submit_stage_answer(uuid, text, text, text)
+  to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Masuk interview + otomatis lanjut ke tahap berikutnya.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.advance_interview_stage(
+  p_stage_id uuid
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_stage public.application_stages%rowtype;
+begin
+  if v_user_id is null then
+    raise exception 'Kamu harus masuk terlebih dahulu.';
+  end if;
+
+  select s.* into v_stage
+  from public.application_stages s
+  join public.applications a on a.id = s.application_id
+  where s.id = p_stage_id
+    and a.user_id = v_user_id
+    and s.kind = 'interview'
+    and s.status = 'current';
+
+  if not found then
+    raise exception 'Tahap interview tidak tersedia atau sudah selesai.';
+  end if;
+
+  update public.application_stages
+  set
+    status = 'completed',
+    completed_at = now()
+  where id = v_stage.id;
+
+  update public.application_stages
+  set status = 'current'
+  where id = (
+    select id
+    from public.application_stages
+    where application_id = v_stage.application_id
+      and status = 'locked'
+      and sort_order > v_stage.sort_order
+    order by sort_order
+    limit 1
+  );
+
+  return v_stage.application_id;
+end;
+$$;
+
+revoke all on function public.advance_interview_stage(uuid)
+  from public, anon;
+
+grant execute on function public.advance_interview_stage(uuid)
   to authenticated;
 
 -- ---------------------------------------------------------------------------
@@ -1029,6 +1109,28 @@ where title = 'Hasil Akhir';
 -- Sinkronkan jenis tahapan untuk lamaran yang sudah ada.
 update public.application_stages s
 set kind = js.kind
+from public.applications a, public.job_stages js
+where a.id = s.application_id
+  and js.job_id = a.job_id
+  and js.sort_order = s.sort_order;
+
+-- Contoh link interview. Ganti lewat Table Editor untuk data nyata.
+update public.job_stages
+set
+  meeting_type = 'gmeet',
+  meeting_url = 'https://meet.google.com/new'
+where title = 'Interview HR';
+
+update public.job_stages
+set
+  meeting_type = 'ai',
+  meeting_url = 'https://interview.example.com'
+where title = 'Interview User';
+
+update public.application_stages s
+set
+  meeting_type = js.meeting_type,
+  meeting_url = js.meeting_url
 from public.applications a, public.job_stages js
 where a.id = s.application_id
   and js.job_id = a.job_id

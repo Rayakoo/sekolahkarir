@@ -14,6 +14,7 @@ import { formatDate, formatSchedule } from "@/lib/format";
 import { requireUser } from "@/lib/supabase/auth";
 import type { ApplicationStage } from "@/lib/types";
 
+import { InterviewStageActions } from "./interview-stage-actions";
 import { StageSubmissionForm } from "./stage-submission-form";
 
 export const instant = false;
@@ -80,7 +81,11 @@ export default async function ApplicationTimelinePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ baru?: string; submitted?: string }>;
+  searchParams: Promise<{
+    baru?: string;
+    submitted?: string;
+    interview?: string;
+  }>;
 }) {
   const [{ id }, query, { user, supabase }] = await Promise.all([
     params,
@@ -91,7 +96,7 @@ export default async function ApplicationTimelinePage({
   const { data } = await supabase
     .from("applications")
     .select(
-      "id, status, created_at, cv_title, cv_source, jobs(slug, title, team, location), application_stages(id, title, description, kind, sort_order, status, scheduled_start, scheduled_end, note, completed_at, stage_submissions(id, file_url, link_url, note, submitted_at))",
+      "id, status, created_at, cv_title, cv_source, jobs(slug, title, team, location), application_stages(id, title, description, kind, meeting_type, meeting_url, sort_order, status, scheduled_start, scheduled_end, note, completed_at, stage_submissions(id, file_url, link_url, note, submitted_at))",
     )
     .eq("id", id)
     .eq("user_id", user.id)
@@ -125,8 +130,15 @@ export default async function ApplicationTimelinePage({
 
       {query.submitted ? (
         <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-          Jawaban tes berhasil disimpan. Tim rekrutmen akan meninjau file atau
-          link yang kamu kirim.
+          Jawaban tes berhasil disimpan. Timeline otomatis lanjut ke tahap
+          berikutnya.
+        </div>
+      ) : null}
+
+      {query.interview ? (
+        <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Tahap interview ditandai selesai. Timeline sudah lanjut ke tahap
+          berikutnya.
         </div>
       ) : null}
 
@@ -310,6 +322,28 @@ export default async function ApplicationTimelinePage({
                         stageId={stage.id}
                         initialSubmission={submission}
                       />
+                    ) : null}
+
+                    {stage.kind === "interview" &&
+                    stage.status === "current" ? (
+                      <InterviewStageActions
+                        stageId={stage.id}
+                        meetingUrl={stage.meeting_url}
+                        meetingType={stage.meeting_type}
+                      />
+                    ) : null}
+
+                    {stage.kind === "announcement" &&
+                    stage.status === "current" ? (
+                      <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-4">
+                        <p className="text-sm font-semibold text-brand-950">
+                          Menunggu pengumuman
+                        </p>
+                        <p className="mt-1 text-sm leading-6 text-slate-600">
+                          Sedang menunggu pengumuman. Semoga Anda mendapatkan
+                          hasil yang terbaik.
+                        </p>
+                      </div>
                     ) : null}
 
                     {stage.kind === "test" &&

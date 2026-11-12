@@ -40,6 +40,10 @@ Setiap lowongan memiliki timeline yang dapat berbeda. Contohnya, posisi Frontend
   - menambahkan catatan,
   - memperbarui jawaban selama tahap masih berjalan,
   - otomatis menyelesaikan tahap tes dan membuka tahap berikutnya (mode demo).
+- **Aksi interview** pada tahap bertipe interview:
+  - tombol untuk membuka Google Meet atau Interview AI,
+  - tombol **Masuk** untuk membuka sesi dan langsung memajukan timeline.
+- **Pesan menunggu pengumuman** pada tahap akhir yang sedang berjalan.
 
 ### Pengelolaan dan keamanan
 
@@ -191,6 +195,8 @@ proxy.ts                         # Refresh sesi dan proteksi route
 - Export CV mengandalkan dialog print browser, belum menghasilkan PDF langsung di server.
 - File upload memakai layanan bersama Omahnalar dan mengembalikan URL file. Untuk kebutuhan produksi yang lebih ketat, file sebaiknya dipindahkan ke storage privat dengan signed URL.
 - Semua jawaban tes dianggap lolos dan langsung memajukan timeline karena ini mode demo.
+- Tombol interview juga langsung memajukan timeline saat ditekan, tanpa menunggu review admin.
+- Link Google Meet dan Interview AI pada seed data masih berupa contoh dan perlu diganti melalui Table Editor.
 - Belum ada notifikasi email otomatis untuk perubahan status lamaran.
 - Belum ada rate limit atau CAPTCHA pada form upload dan lamaran.
 

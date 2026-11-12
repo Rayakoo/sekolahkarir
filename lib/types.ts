@@ -5,6 +5,8 @@ export type JobStage = {
   title: string;
   description: string | null;
   kind: StageKind;
+  meeting_type: "gmeet" | "ai" | "other" | null;
+  meeting_url: string | null;
   sort_order: number;
 };
 
@@ -56,6 +58,8 @@ export type ApplicationStage = {
   title: string;
   description: string | null;
   kind: StageKind;
+  meeting_type: "gmeet" | "ai" | "other" | null;
+  meeting_url: string | null;
   sort_order: number;
   status: "locked" | "current" | "completed" | "rejected";
   scheduled_start: string | null;

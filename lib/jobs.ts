@@ -40,7 +40,7 @@ export async function getJobBySlug(
     const supabase = createPublicClient();
     const { data, error } = await supabase
       .from("jobs")
-      .select(`${JOB_FIELDS}, job_stages(id, title, description, kind, sort_order)`)
+      .select(`${JOB_FIELDS}, job_stages(id, title, description, kind, meeting_type, meeting_url, sort_order)`)
       .eq("slug", slug)
       .eq("is_open", true)
       .maybeSingle();
