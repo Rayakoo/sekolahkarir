@@ -508,7 +508,6 @@ proxy.ts                         # Refresh sesi dan proteksi route
 
 - Dashboard admin belum tersedia; pengelolaan lowongan, timeline, dan progres dilakukan melalui Supabase Table Editor.
 - Export CV mengandalkan dialog print browser, belum menghasilkan PDF langsung di server.
-- File upload memakai layanan bersama Omahnalar dan mengembalikan URL file. Untuk kebutuhan produksi yang lebih ketat, file sebaiknya dipindahkan ke storage privat dengan signed URL.
 - Semua jawaban tes dianggap lolos dan langsung memajukan timeline karena ini mode demo.
 - Tombol interview juga langsung memajukan timeline saat ditekan, tanpa menunggu review admin.
 - Link Google Meet dan Interview AI pada seed data masih berupa contoh dan perlu diganti melalui Table Editor.
